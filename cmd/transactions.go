@@ -46,11 +46,14 @@ var (
 
 			// Get flag values
 			rawMode, _ := cmd.Flags().GetBool("raw")
+			detailMode, _ := cmd.Flags().GetBool("detail")
 			status, _ := cmd.Flags().GetString("status")
 			since, _ := cmd.Flags().GetString("since")
 			until, _ := cmd.Flags().GetString("until")
 			category, _ := cmd.Flags().GetString("category")
 			tag, _ := cmd.Flags().GetString("tag")
+			currency, _ := cmd.Flags().GetString("currency")
+			description, _ := cmd.Flags().GetString("description")
 
 			// Build query parameters
 			params := make(map[string]string)
@@ -91,17 +94,41 @@ var (
 				return err
 			}
 
+			// Apply client-side filters
+			var filteredTransactions []models.Transaction
+			for _, tx := range transactions {
+				// Filter by currency if specified
+				if currency != "" {
+					// Check if transaction has foreign amount with matching currency
+					if tx.Attributes.ForeignAmount == nil ||
+					   !strings.EqualFold(tx.Attributes.ForeignAmount.CurrencyCode, currency) {
+						continue
+					}
+				}
+
+				// Filter by description if specified
+				if description != "" {
+					if !strings.Contains(strings.ToLower(tx.Attributes.Description), strings.ToLower(description)) {
+						continue
+					}
+				}
+
+				filteredTransactions = append(filteredTransactions, tx)
+			}
+
 			// Sort transactions by date (newest first)
-			sort.Sort(models.ByDate(transactions))
+			sort.Sort(models.ByDate(filteredTransactions))
 
 			t := table.NewWriter()
 			t.SetOutputMirror(cmd.OutOrStdout())
 
 			// Set header based on mode
 			if rawMode {
-				t.AppendHeader(table.Row{"ID", "Date", "Description", "Message", "Amount", "Currency", "Status", "Category", "Tags"})
+				t.AppendHeader(table.Row{"ID", "Date", "Description", "Message", "Amount", "Currency", "Foreign Amount", "Foreign Currency", "Status", "Category", "Tags"})
+			} else if detailMode {
+				t.AppendHeader(table.Row{"Date", "Description", "Message", "Amount", "Currency", "Foreign Amount", "Foreign Currency", "Category", "Tags"})
 			} else {
-				t.AppendHeader(table.Row{"Date", "Description", "Message", "Amount", "Currency", "Status", "Category", "Tags"})
+				t.AppendHeader(table.Row{"Date", "Description", "Amount", "Currency", "Category"})
 			}
 
 			// Use built-in dark style
@@ -113,7 +140,7 @@ var (
 			p := message.NewPrinter(language.English)
 
 			var totalDebit, totalCredit float64
-			for _, tx := range transactions {
+			for _, tx := range filteredTransactions {
 				amount, err := strconv.ParseFloat(tx.Attributes.Amount.Value, 64)
 				if err != nil {
 					return fmt.Errorf("error parsing amount: %v", err)
@@ -133,6 +160,17 @@ var (
 					baseUnits := tx.Attributes.Amount.ValueInBaseUnits
 					// Format with 2 decimal places
 					formattedAmount = p.Sprintf("%.2f", float64(baseUnits)/100.0)
+				}
+
+				// Format foreign amount if available and in detail mode
+				var formattedForeignAmount, foreignCurrency string
+				if (detailMode || rawMode) && tx.Attributes.ForeignAmount != nil {
+					formattedForeignAmount = tx.Attributes.ForeignAmount.Value
+					if !rawMode {
+						baseUnits := tx.Attributes.ForeignAmount.ValueInBaseUnits
+						formattedForeignAmount = p.Sprintf("%.2f", float64(baseUnits)/100.0)
+					}
+					foreignCurrency = tx.Attributes.ForeignAmount.CurrencyCode
 				}
 
 				// Format date
@@ -163,7 +201,21 @@ var (
 						tx.Attributes.Message,
 						formattedAmount,
 						tx.Attributes.Amount.CurrencyCode,
+						formattedForeignAmount,
+						foreignCurrency,
 						tx.Attributes.Status,
+						categoryName,
+						tagsStr,
+					})
+				} else if detailMode {
+					t.AppendRow(table.Row{
+						date,
+						tx.Attributes.Description,
+						tx.Attributes.Message,
+						formattedAmount,
+						tx.Attributes.Amount.CurrencyCode,
+						formattedForeignAmount,
+						foreignCurrency,
 						categoryName,
 						tagsStr,
 					})
@@ -171,12 +223,9 @@ var (
 					t.AppendRow(table.Row{
 						date,
 						tx.Attributes.Description,
-						tx.Attributes.Message,
 						formattedAmount,
 						tx.Attributes.Amount.CurrencyCode,
-						tx.Attributes.Status,
 						categoryName,
-						tagsStr,
 					})
 				}
 			}
@@ -186,15 +235,27 @@ var (
 			if !rawMode {
 				formattedDebit := p.Sprintf("%.2f", totalDebit)
 				formattedCredit := p.Sprintf("%.2f", totalCredit)
-				t.AppendFooter(table.Row{
-					"", "", "Debits 💸", formattedDebit, "AUD", "", "", "",
-				})
-				t.AppendFooter(table.Row{
-					"", "", "Credits 💰", formattedCredit, "AUD", "", "", "",
-				})
-				t.AppendFooter(table.Row{
-					"", "", "Net 🏦", p.Sprintf("%.2f", totalDebit+totalCredit), "AUD", "", "", "",
-				})
+				if detailMode {
+					t.AppendFooter(table.Row{
+						"", "Debits 💸", "", formattedDebit, "AUD", "", "", "", "",
+					})
+					t.AppendFooter(table.Row{
+						"", "Credits 💰", "", formattedCredit, "AUD", "", "", "", "",
+					})
+					t.AppendFooter(table.Row{
+						"", "Net 🏦", "", p.Sprintf("%.2f", totalDebit+totalCredit), "AUD", "", "", "", "",
+					})
+				} else {
+					t.AppendFooter(table.Row{
+						"", "Debits 💸", formattedDebit, "AUD", "",
+					})
+					t.AppendFooter(table.Row{
+						"", "Credits 💰", formattedCredit, "AUD", "",
+					})
+					t.AppendFooter(table.Row{
+						"", "Net 🏦", p.Sprintf("%.2f", totalDebit+totalCredit), "AUD", "",
+					})
+				}
 			}
 
 			t.Render()
@@ -205,10 +266,13 @@ var (
 
 func init() {
 	transactionsCmd.Flags().Bool("raw", false, "Display raw numbers without pretty formatting")
+	transactionsCmd.Flags().Bool("detail", false, "Display detailed information including message, foreign amounts, and tags")
 	transactionsCmd.Flags().String("status", "", "Filter transactions by status (HELD, SETTLED)")
 	transactionsCmd.Flags().String("since", "", "Filter transactions from this date/time (format: YYYY-MM-DD or RFC3339 e.g. 2020-01-01T01:02:03+10:00). For date-only input, time will be set to 00:00:00")
 	transactionsCmd.Flags().String("until", "", "Filter transactions until this date/time (format: YYYY-MM-DD or RFC3339 e.g. 2020-01-01T01:02:03+10:00). For date-only input, time will be set to 00:00:00")
 	transactionsCmd.Flags().String("category", "", "Filter transactions by category ID")
 	transactionsCmd.Flags().String("tag", "", "Filter transactions by tag ID")
+	transactionsCmd.Flags().String("currency", "", "Filter transactions by foreign currency code (e.g., JPY). This is a client-side filter.")
+	transactionsCmd.Flags().String("description", "", "Filter transactions by description (case-insensitive partial match). This is a client-side filter.")
 	rootCmd.AddCommand(transactionsCmd)
 }

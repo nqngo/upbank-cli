@@ -9,7 +9,10 @@ A command-line interface for Up Bank, allowing you to manage your finances from 
   - Filter by date range (supports both YYYY-MM-DD and RFC3339 formats)
   - Filter by category
   - Filter by tag
+  - Filter by foreign currency
+  - Filter by description text (case-insensitive)
   - Display transaction totals (debits, credits, and net balance)
+  - Multiple display modes (default, detail, raw)
 - List accounts and their balances
 - Raw mode output for scripting and automation
 
@@ -51,21 +54,40 @@ export UP_API_TOKEN=your_api_token_here
 
 # List transactions in raw mode (without pretty formatting)
 ./upbank-cli transactions --raw
+
+# List transactions in detail mode (showing message, foreign amounts, and tags)
+./upbank-cli transactions --detail
+
+# Filter transactions by foreign currency
+./upbank-cli transactions --currency JPY
+
+# Filter transactions by description text
+./upbank-cli transactions --description "Osaka"
+
+# Combine multiple filters
+./upbank-cli transactions --currency JPY --description "Osaka" --detail
 ```
 
-#### Raw Mode
-The `--raw` flag outputs transactions in a format suitable for scripting and automation:
-- No pretty formatting or colors
-- No summary totals
-- Includes transaction IDs
-- Uses RFC3339 timestamp format
-- Raw number values without thousand separators
+#### Display Modes
+The CLI supports three display modes for transactions:
 
-Example usage in a script:
-```bash
-# Get transactions and process with awk
-./upbank-cli transactions --raw | awk -F '|' '{print $3, $5}' > transactions.txt
-```
+1. Default Mode (no flags):
+   - Shows essential information: date, description, amount, currency, category
+   - Clean and concise output
+   - Includes summary totals
+
+2. Detail Mode (`--detail`):
+   - Shows additional information: message, foreign amounts, tags
+   - Useful for reviewing transaction details
+   - Includes summary totals
+
+3. Raw Mode (`--raw`):
+   - Shows all available information
+   - No pretty formatting or colors
+   - Includes transaction IDs
+   - Uses RFC3339 timestamp format
+   - Raw number values without thousand separators
+   - Suitable for scripting and automation
 
 #### Transaction Filtering Options
 - `--status`: Filter by transaction status (HELD, SETTLED)
@@ -77,17 +99,27 @@ Example usage in a script:
   - Same format options as `--since`
 - `--category`: Filter by category ID
 - `--tag`: Filter by tag ID
+- `--currency`: Filter by foreign currency code (e.g., JPY)
+  - Client-side filter
+  - Case-insensitive matching
+  - Only shows transactions with foreign amounts in the specified currency
+- `--description`: Filter by description text
+  - Client-side filter
+  - Case-insensitive partial matching
+  - Matches any part of the description
+  - Example: `--description "Osaka"` will match "Kids Plaza Osaka", "KAITEIROU SHINSAIBASH,OOSAKAFU", etc.
 
 #### Transaction Display
 Transactions are displayed in a table format with the following information:
 - Date and time
 - Description
-- Message
+- Message (in detail mode)
 - Amount (with proper formatting)
 - Currency
-- Status
+- Foreign amount and currency (in detail mode)
+- Status (in raw mode)
 - Category
-- Tags
+- Tags (in detail mode)
 
 The display includes summary totals at the bottom:
 - 💸 Debits: Total of all negative transactions (money spent)

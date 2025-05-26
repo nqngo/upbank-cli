@@ -20,16 +20,10 @@ A command-line interface for Up Bank, allowing you to manage your finances from 
 
 ### Quick Install (Linux/macOS)
 
-Download the latest release directly from GitHub:
+You can install the CLI with a single command:
 
 ```bash
-# For Linux
-curl -L https://github.com/nqngo/upbank-cli/releases/latest/download/upbank-cli_Linux_x86_64.tar.gz | tar xz
-sudo mv upbank-cli /usr/local/bin/
-
-# For macOS
-curl -L https://github.com/nqngo/upbank-cli/releases/latest/download/upbank-cli_Darwin_x86_64.tar.gz | tar xz
-sudo mv upbank-cli /usr/local/bin/
+curl -sSL https://raw.githubusercontent.com/nqngo/upbank-cli/main/install.sh | bash
 ```
 
 ### From Source

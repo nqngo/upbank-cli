@@ -52,9 +52,9 @@ func (c *Client) GetAccounts(params map[string]string) ([]models.Account, error)
 		return nil, fmt.Errorf("error making request: %v", err)
 	}
 	defer func() {
-		if err := resp.Body.Close(); err != nil {
+		if closeErr := resp.Body.Close(); closeErr != nil {
 			// Log the error but don't return it since we're in a defer
-			fmt.Printf("Error closing response body: %v\n", err)
+			fmt.Printf("Error closing response body: %v\n", closeErr)
 		}
 	}()
 
@@ -98,16 +98,22 @@ func (c *Client) GetTransactions(params map[string]string) ([]models.Transaction
 		}
 
 		if resp.StatusCode != http.StatusOK {
-			resp.Body.Close()
+			if closeErr := resp.Body.Close(); closeErr != nil {
+				fmt.Printf("Error closing response body: %v\n", closeErr)
+			}
 			return nil, fmt.Errorf("API request failed with status: %d", resp.StatusCode)
 		}
 
 		var transactionsResp models.TransactionsResponse
 		if err := json.NewDecoder(resp.Body).Decode(&transactionsResp); err != nil {
-			resp.Body.Close()
+			if closeErr := resp.Body.Close(); closeErr != nil {
+				fmt.Printf("Error closing response body: %v\n", closeErr)
+			}
 			return nil, err
 		}
-		resp.Body.Close()
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			fmt.Printf("Error closing response body: %v\n", closeErr)
+		}
 
 		allTransactions = append(allTransactions, transactionsResp.Data...)
 

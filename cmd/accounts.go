@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"sort"
 	"strconv"
-	"strings"
 	"time"
 	"upbank-cli/pkg/api"
 	"upbank-cli/pkg/models"

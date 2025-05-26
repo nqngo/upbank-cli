@@ -49,7 +49,7 @@ go build
 Ensure you have a valid Up Bank API token. See [Up Bank API Documentation](https://developer.up.com.au/) for more information. To start:
 
 ```bash
-export UP_API_TOKEN=your_api_token_here
+export UPBANK_API_TOKEN=your_api_token_here
 ```
 
 ### List Transactions

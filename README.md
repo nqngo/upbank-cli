@@ -23,7 +23,7 @@ A command-line interface for Up Bank, allowing you to manage your finances from 
 You can install the CLI with a single command:
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/nqngo/upbank-cli/main/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/nqngo/upbank-cli/refs/heads/main/install.sh | bash
 ```
 
 ### From Source
